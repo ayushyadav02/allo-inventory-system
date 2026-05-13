@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 📦 Inventory Reservation System
 
-## Getting Started
+A concurrency-safe inventory reservation system built with **Next.js App Router**, **TypeScript**, **Prisma**, **Supabase PostgreSQL**, and **Tailwind CSS**.
 
-First, run the development server:
+## ✨ Features
+
+- **Product & Warehouse Management** — Browse products with stock levels per warehouse
+- **Reservation System** — Reserve stock with PENDING → CONFIRMED / RELEASED flow
+- **10-Minute Expiry** — Live countdown timer with lazy cleanup on expired reservations
+- **Concurrency-Safe** — Uses Prisma transactions to prevent overselling
+- **Error Handling** — Proper 409 (conflict) and 410 (gone/expired) error responses shown in UI
+
+## 🛠 Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Language**: TypeScript
+- **ORM**: Prisma v7
+- **Database**: Supabase PostgreSQL
+- **Styling**: Tailwind CSS v4
+- **Deployment**: Vercel + Supabase
+
+## 📁 Project Structure
+
+```
+app/
+├── api/
+│   ├── products/route.ts           GET  /api/products
+│   ├── warehouses/route.ts         GET  /api/warehouses
+│   └── reservations/
+│       ├── route.ts                POST /api/reservations
+│       └── [id]/
+│           ├── confirm/route.ts    POST /api/reservations/:id/confirm
+│           └── release/route.ts    POST /api/reservations/:id/release
+├── reserve/page.tsx                Reservation checkout page
+├── page.tsx                        Product listing page
+├── layout.tsx                      Root layout with nav
+└── globals.css                     Design system
+lib/
+├── prisma.ts                       Prisma client singleton
+└── cleanup.ts                      Lazy expiry cleanup helper
+prisma/
+├── schema.prisma                   Database schema
+└── seed.ts                         Demo data seed script
+```
+
+## 🚀 Setup
+
+### Prerequisites
+
+- Node.js 18+
+- A [Supabase](https://supabase.com) project (free tier works)
+
+### 1. Clone & Install
+
+```bash
+git clone https://github.com/ayushyadav02/allo-inventory-system.git
+cd allo-inventory-system
+npm install
+```
+
+### 2. Configure Environment
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your Supabase connection strings:
+- `DATABASE_URL` — Pooler connection (port 6543, with `?pgbouncer=true`)
+- `DIRECT_URL` — Direct connection (port 5432, for Prisma CLI)
+
+You can find these in your Supabase Dashboard → Settings → Database → Connection string.
+
+### 3. Push Schema & Seed
+
+```bash
+npx prisma db push
+npx prisma generate
+npm run seed
+```
+
+### 4. Run Dev Server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📡 API Reference
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/products` | List all products with stock info |
+| GET | `/api/warehouses` | List all warehouses with stock info |
+| POST | `/api/reservations` | Create a reservation (body: `{ productId, warehouseId, quantity }`) |
+| POST | `/api/reservations/:id/confirm` | Confirm a pending reservation |
+| POST | `/api/reservations/:id/release` | Release a pending reservation |
 
-## Learn More
+### Error Codes
 
-To learn more about Next.js, take a look at the following resources:
+| Code | Meaning |
+|------|---------|
+| 409 | Insufficient stock — not enough available units |
+| 410 | Reservation expired or already confirmed/released |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🧠 How It Works
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. **Reserve**: User picks a product + warehouse + quantity. A `$transaction` atomically checks availability and increments `reservedUnits`. Reservation expires in 10 minutes.
 
-## Deploy on Vercel
+2. **Countdown**: The UI shows a live countdown. When it hits 0, the reservation auto-expires.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+3. **Confirm**: Deducts from `totalUnits` and decreases `reservedUnits` (stock is sold).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+4. **Release**: Decreases `reservedUnits` (stock goes back to available).
+
+5. **Lazy Cleanup**: Before confirm/release, the system checks if the reservation has expired and auto-releases it if needed. No cron job required.
+
+## 🚢 Deploy
+
+### Vercel
+
+1. Push your code to GitHub
+2. Import the repo on [Vercel](https://vercel.com)
+3. Add `DATABASE_URL` to environment variables
+4. Deploy!
+
+### Supabase
+
+The database is already on Supabase. Just make sure your tables exist by running `npx prisma db push` once.
+
+## 📄 License
+
+MIT
