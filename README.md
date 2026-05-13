@@ -1,133 +1,67 @@
-# 📦 Inventory Reservation System
+# 📦 InventoryRS
 
-A concurrency-safe inventory reservation system built with **Next.js App Router**, **TypeScript**, **Prisma**, **Supabase PostgreSQL**, and **Tailwind CSS**.
+Hey there! 👋 Welcome to **InventoryRS**, a little side project I put together to handle inventory reservations safely without double-selling stock.
 
-## ✨ Features
+It's built with the Next.js App Router and Prisma, and it hooks up to a Supabase PostgreSQL database. I wanted to see how easily I could manage high-concurrency stock holds, and this is the result!
 
-- **Product & Warehouse Management** — Browse products with stock levels per warehouse
-- **Reservation System** — Reserve stock with PENDING → CONFIRMED / RELEASED flow
-- **10-Minute Expiry** — Live countdown timer with lazy cleanup on expired reservations
-- **Concurrency-Safe** — Uses Prisma transactions to prevent overselling
-- **Error Handling** — Proper 409 (conflict) and 410 (gone/expired) error responses shown in UI
+## ✨ What does it do?
 
-## 🛠 Tech Stack
+- **Real-time Inventory** — You can browse through products and instantly see how many units are available at different warehouses.
+- **Hold My Spot** — When you click "Reserve", the system actually locks in that stock for you for 10 minutes. Nobody else can snatch it while you're checking out.
+- **Concurrency-Safe** — Under the hood, I'm using Prisma database transactions so even if 100 people click "Reserve" at the exact same millisecond, the math stays perfect and we never oversell.
+- **Lazy Cleanup** — Instead of running a heavy background cron job to release expired 10-minute holds, the app cleans them up "lazily" the next time someone interacts with the system. Pretty neat!
 
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **ORM**: Prisma v7
-- **Database**: Supabase PostgreSQL
-- **Styling**: Tailwind CSS v4
-- **Deployment**: Vercel + Supabase
+## 🛠 What's under the hood?
 
-## 📁 Project Structure
+I kept the stack pretty modern:
+- **Next.js 16 (App Router)** for the frontend and API routes.
+- **TypeScript** everywhere.
+- **Prisma** to talk to the database.
+- **Supabase** for hosting the Postgres database.
+- **Tailwind CSS v4** for styling (keeping it clean with a custom light theme and Outfit font!).
 
-```
-app/
-├── api/
-│   ├── products/route.ts           GET  /api/products
-│   ├── warehouses/route.ts         GET  /api/warehouses
-│   └── reservations/
-│       ├── route.ts                POST /api/reservations
-│       └── [id]/
-│           ├── confirm/route.ts    POST /api/reservations/:id/confirm
-│           └── release/route.ts    POST /api/reservations/:id/release
-├── reserve/page.tsx                Reservation checkout page
-├── page.tsx                        Product listing page
-├── layout.tsx                      Root layout with nav
-└── globals.css                     Design system
-lib/
-├── prisma.ts                       Prisma client singleton
-└── cleanup.ts                      Lazy expiry cleanup helper
-prisma/
-├── schema.prisma                   Database schema
-└── seed.ts                         Demo data seed script
-```
+## 🚀 Want to run it yourself?
 
-## 🚀 Setup
+If you want to spin this up locally, it's super easy. You just need Node.js and a free Supabase account.
 
-### Prerequisites
-
-- Node.js 18+
-- A [Supabase](https://supabase.com) project (free tier works)
-
-### 1. Clone & Install
-
+**1. Clone it down**
 ```bash
 git clone https://github.com/ayushyadav02/allo-inventory-system.git
 cd allo-inventory-system
 npm install
 ```
 
-### 2. Configure Environment
-
+**2. Set up your environment variables**
+Copy the example file to get started:
 ```bash
 cp .env.example .env
 ```
+Then, open `.env` and drop in your Supabase connection strings. You'll need the Pooler connection for `DATABASE_URL` and the Direct connection for `DIRECT_URL`.
 
-Edit `.env` with your Supabase connection strings:
-- `DATABASE_URL` — Pooler connection (port 6543, with `?pgbouncer=true`)
-- `DIRECT_URL` — Direct connection (port 5432, for Prisma CLI)
-
-You can find these in your Supabase Dashboard → Settings → Database → Connection string.
-
-### 3. Push Schema & Seed
-
+**3. Push the database schema and seed some data**
 ```bash
 npx prisma db push
 npx prisma generate
 npm run seed
 ```
+*(This creates all the tables and adds some dummy products so you have something to look at).*
 
-### 4. Run Dev Server
-
+**4. Fire it up!**
 ```bash
 npm run dev
 ```
+Now just head over to [http://localhost:3000](http://localhost:3000) and click around.
 
-Open [http://localhost:3000](http://localhost:3000).
+## 🧠 How the reservation math actually works
 
-## 📡 API Reference
+If you're curious about the backend logic:
+1. **Reserving:** When you reserve something, the system starts a transaction, checks if there's enough `totalUnits - reservedUnits`, and if so, it increments `reservedUnits` and gives you a 10-minute hold.
+2. **Confirming:** If you "buy" the item, the system permanently deducts the stock from `totalUnits` and clears your `reservedUnits` hold.
+3. **Releasing:** If you cancel (or time out), it just decreases `reservedUnits` so the stock is available for the next person.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/products` | List all products with stock info |
-| GET | `/api/warehouses` | List all warehouses with stock info |
-| POST | `/api/reservations` | Create a reservation (body: `{ productId, warehouseId, quantity }`) |
-| POST | `/api/reservations/:id/confirm` | Confirm a pending reservation |
-| POST | `/api/reservations/:id/release` | Release a pending reservation |
+## 🚢 Deploying
 
-### Error Codes
+If you want to put this on the internet, just push it to GitHub and import it into Vercel. Make sure to add your `DATABASE_URL` in the Vercel dashboard environment variables, and you're good to go.
 
-| Code | Meaning |
-|------|---------|
-| 409 | Insufficient stock — not enough available units |
-| 410 | Reservation expired or already confirmed/released |
-
-## 🧠 How It Works
-
-1. **Reserve**: User picks a product + warehouse + quantity. A `$transaction` atomically checks availability and increments `reservedUnits`. Reservation expires in 10 minutes.
-
-2. **Countdown**: The UI shows a live countdown. When it hits 0, the reservation auto-expires.
-
-3. **Confirm**: Deducts from `totalUnits` and decreases `reservedUnits` (stock is sold).
-
-4. **Release**: Decreases `reservedUnits` (stock goes back to available).
-
-5. **Lazy Cleanup**: Before confirm/release, the system checks if the reservation has expired and auto-releases it if needed. No cron job required.
-
-## 🚢 Deploy
-
-### Vercel
-
-1. Push your code to GitHub
-2. Import the repo on [Vercel](https://vercel.com)
-3. Add `DATABASE_URL` to environment variables
-4. Deploy!
-
-### Supabase
-
-The database is already on Supabase. Just make sure your tables exist by running `npx prisma db push` once.
-
-## 📄 License
-
-MIT
+---
+Feel free to fork this, tear it apart, or use it for your own projects! (MIT License)
