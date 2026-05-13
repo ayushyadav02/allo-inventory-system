@@ -5,6 +5,7 @@ import { ProductCard } from "@/components/inventory/ProductCard";
 import { PackageSearch } from "lucide-react";
 
 export default function HomePage() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,6 +23,7 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchProducts();
   }, []);
 

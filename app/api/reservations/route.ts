@@ -1,15 +1,15 @@
 import { InventoryService } from "@/lib/services/inventory";
 import { CreateReservationSchema } from "@/lib/schemas";
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const result = CreateReservationSchema.safeParse(body);
 
     if (!result.success) {
       return NextResponse.json(
-        { error: result.error.errors[0].message },
+        { error: result.error.issues[0]?.message || "Invalid request data" },
         { status: 400 }
       );
     }
@@ -18,9 +18,15 @@ export async function POST(request: NextRequest) {
     const reservation = await InventoryService.reserve(productId, warehouseId, quantity);
 
     return NextResponse.json(reservation, { status: 201 });
-  } catch (error: any) {
-    if (error.message === "INSUFFICIENT_STOCK") {
-      return NextResponse.json({ error: "Not enough stock available." }, { status: 409 });
+  } catch (error: unknown) {
+    console.error("[RESERVATION_ERROR]", error);
+    if (error instanceof Error) {
+      if (error.message === "INSUFFICIENT_STOCK") {
+        return NextResponse.json({ error: "Not enough stock available." }, { status: 409 });
+      }
+      if (error.message === "STOCK_NOT_FOUND") {
+        return NextResponse.json({ error: "Product stock not found in this warehouse." }, { status: 404 });
+      }
     }
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

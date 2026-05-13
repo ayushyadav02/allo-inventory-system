@@ -1,6 +1,5 @@
 import Link from "next/link";
 import Image from "next/image";
-import { cn } from "@/lib/utils";
 
 type Stock = {
   warehouseId: string;
@@ -18,8 +17,6 @@ type Product = {
 };
 
 export function ProductCard({ product }: { product: Product }) {
-  const totalAvailable = product.stocks.reduce((acc, s) => acc + s.availableUnits, 0);
-
   return (
     <div className="bg-card-bg border border-card-border rounded-2xl overflow-hidden flex flex-col group hover:border-accent/30">
       <div className="relative aspect-[4/3] bg-background">
@@ -28,6 +25,7 @@ export function ProductCard({ product }: { product: Product }) {
             src={product.imageUrl}
             alt={product.name}
             fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover"
           />
         ) : (

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Clock, ShieldCheck, Warehouse, ArrowLeft, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { Clock, Warehouse, ArrowLeft, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Reservation = {
@@ -70,8 +70,8 @@ function ReservePageContent() {
       const remaining = Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000);
       setTimeLeft(remaining);
       toast.success("Stock Reserved", { description: `Held for 10 minutes.` });
-    } catch (e: any) {
-      toast.error("Reservation Failed", { description: e.message });
+    } catch (e: unknown) {
+      toast.error("Reservation Failed", { description: e instanceof Error ? e.message : "An error occurred" });
     } finally {
       setLoading(null);
     }
@@ -87,8 +87,8 @@ function ReservePageContent() {
 
       setReservation(data);
       toast.success(action === "confirm" ? "Order Confirmed" : "Hold Released");
-    } catch (e: any) {
-      toast.error(`${action === "confirm" ? "Confirmation" : "Release"} Failed`, { description: e.message });
+    } catch (e: unknown) {
+      toast.error(`${action === "confirm" ? "Confirmation" : "Release"} Failed`, { description: e instanceof Error ? e.message : "An error occurred" });
     } finally {
       setLoading(null);
     }
