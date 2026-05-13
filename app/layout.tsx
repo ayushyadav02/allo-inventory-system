@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "InventoryRS — Premium Stock Management",
+  title: "Inventory System",
   description: "Enterprise-grade inventory reservation system.",
 };
 
@@ -31,7 +31,7 @@ export default function RootLayout({
         <header className="border-b border-card-border bg-card-bg/80 backdrop-blur-md sticky top-0 z-50">
           <nav className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
             <Link href="/" className="text-xl font-bold tracking-tight text-foreground flex items-center gap-2">
-              InventoryRS
+              Inventory System
             </Link>
           </nav>
         </header>
