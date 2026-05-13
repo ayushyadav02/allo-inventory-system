@@ -31,8 +31,6 @@ function ReservePageContent() {
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
   const [loading, setLoading] = useState<string | null>(null);
-
-  // Countdown logic
   useEffect(() => {
     if (!reservation || reservation.status !== "PENDING") return;
 
@@ -141,13 +139,6 @@ function ReservePageContent() {
                     {quantity}
                   </div>
                 </div>
-              </div>
-
-              <div className="bg-accent/5 border border-accent/20 rounded-2xl p-4 flex gap-4">
-                <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
-                <p className="text-xs text-muted leading-relaxed">
-                  Reservations are immediate and concurrency-safe. This hold prevents other users from purchasing these units while you checkout.
-                </p>
               </div>
 
               <button

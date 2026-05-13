@@ -85,7 +85,7 @@ export class InventoryService {
           warehouseId,
           quantity,
           status: "PENDING",
-          expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 mins
+          expiresAt: new Date(Date.now() + 10 * 60 * 1000),
         },
       });
     });
