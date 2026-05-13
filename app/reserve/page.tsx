@@ -3,6 +3,9 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
+import { Clock, ShieldCheck, Warehouse, ArrowLeft, Loader2, CheckCircle2, XCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type Reservation = {
   id: string;
@@ -27,27 +30,19 @@ function ReservePageContent() {
   const [quantity, setQuantity] = useState(1);
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [timeLeft, setTimeLeft] = useState<number>(0);
-  const [error, setError] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [loading, setLoading] = useState<string | null>(null);
 
-  // Countdown timer
+  // Countdown logic
   useEffect(() => {
     if (!reservation || reservation.status !== "PENDING") return;
 
     const interval = setInterval(() => {
-      const remaining = Math.max(
-        0,
-        Math.floor(
-          (new Date(reservation.expiresAt).getTime() - Date.now()) / 1000
-        )
-      );
+      const remaining = Math.max(0, Math.floor((new Date(reservation.expiresAt).getTime() - Date.now()) / 1000));
       setTimeLeft(remaining);
 
       if (remaining <= 0) {
-        setReservation((prev) =>
-          prev ? { ...prev, status: "RELEASED" } : null
-        );
-        setError("Reservation expired! Stock has been released.");
+        setReservation((prev) => prev ? { ...prev, status: "RELEASED" } : null);
+        toast.error("Reservation Expired", { description: "The stock hold has been released." });
         clearInterval(interval);
       }
     }, 1000);
@@ -62,9 +57,7 @@ function ReservePageContent() {
   };
 
   const handleReserve = async () => {
-    setError(null);
-    setActionLoading("reserve");
-
+    setLoading("reserve");
     try {
       const res = await fetch("/api/reservations", {
         method: "POST",
@@ -73,265 +66,177 @@ function ReservePageContent() {
       });
 
       const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 409) {
-          setError("⚠️ 409 Conflict: " + data.error);
-        } else {
-          setError(data.error || "Failed to create reservation");
-        }
-        return;
-      }
+      if (!res.ok) throw new Error(data.error);
 
       setReservation(data);
-      const remaining = Math.floor(
-        (new Date(data.expiresAt).getTime() - Date.now()) / 1000
-      );
+      const remaining = Math.floor((new Date(data.expiresAt).getTime() - Date.now()) / 1000);
       setTimeLeft(remaining);
-    } catch {
-      setError("Network error. Please try again.");
+      toast.success("Stock Reserved", { description: `Held for 10 minutes.` });
+    } catch (e: any) {
+      toast.error("Reservation Failed", { description: e.message });
     } finally {
-      setActionLoading(null);
+      setLoading(null);
     }
   };
 
-  const handleConfirm = useCallback(async () => {
+  const handleAction = async (action: "confirm" | "release") => {
     if (!reservation) return;
-    setError(null);
-    setActionLoading("confirm");
-
+    setLoading(action);
     try {
-      const res = await fetch(
-        `/api/reservations/${reservation.id}/confirm`,
-        { method: "POST" }
-      );
-
+      const res = await fetch(`/api/reservations/${reservation.id}/${action}`, { method: "POST" });
       const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 410) {
-          setError("⛔ 410 Gone: " + data.error);
-        } else {
-          setError(data.error || "Failed to confirm");
-        }
-        return;
-      }
+      if (!res.ok) throw new Error(data.error);
 
       setReservation(data);
-    } catch {
-      setError("Network error. Please try again.");
+      toast.success(action === "confirm" ? "Order Confirmed" : "Hold Released");
+    } catch (e: any) {
+      toast.error(`${action === "confirm" ? "Confirmation" : "Release"} Failed`, { description: e.message });
     } finally {
-      setActionLoading(null);
+      setLoading(null);
     }
-  }, [reservation]);
-
-  const handleRelease = useCallback(async () => {
-    if (!reservation) return;
-    setError(null);
-    setActionLoading("release");
-
-    try {
-      const res = await fetch(
-        `/api/reservations/${reservation.id}/release`,
-        { method: "POST" }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        if (res.status === 410) {
-          setError("⛔ 410 Gone: " + data.error);
-        } else {
-          setError(data.error || "Failed to release");
-        }
-        return;
-      }
-
-      setReservation(data);
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setActionLoading(null);
-    }
-  }, [reservation]);
-
-  if (!productId || !warehouseId) {
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
-        <p className="text-muted text-lg">Missing product or warehouse info.</p>
-        <Link href="/" className="text-accent hover:underline mt-4 block">
-          ← Back to Products
-        </Link>
-      </div>
-    );
-  }
+  };
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
-      <Link
-        href="/"
-        className="text-muted hover:text-foreground transition-colors text-sm mb-8 inline-block"
-      >
-        ← Back to Products
+    <div className="max-w-2xl mx-auto px-6 py-16">
+      <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-muted hover:text-foreground mb-10 group">
+        <ArrowLeft className="w-4 h-4" />
+        Return to Catalog
       </Link>
 
-      <div className="bg-card-bg border border-card-border rounded-xl p-8">
-        <h1 className="text-2xl font-bold mb-1">{productName}</h1>
-        <p className="text-muted mb-6">🏭 {warehouseName}</p>
-
-        {/* Reserve Form */}
-        {!reservation && (
-          <div className="space-y-4">
+      <div className="bg-card-bg border border-card-border rounded-3xl overflow-hidden shadow-2xl">
+        <div className="p-8 border-b border-card-border bg-accent/5">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <label className="block text-sm font-medium text-muted mb-2">
-                Quantity (max {available})
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={available}
-                value={quantity}
-                onChange={(e) =>
-                  setQuantity(
-                    Math.max(1, Math.min(available, parseInt(e.target.value) || 1))
-                  )
-                }
-                className="w-full bg-background border border-card-border rounded-lg px-4 py-3 text-foreground focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent"
-              />
+              <h1 className="text-3xl font-black text-foreground mb-2">{productName}</h1>
+              <div className="flex items-center gap-2 text-muted text-sm font-medium">
+                <Warehouse className="w-4 h-4 text-accent" />
+                {warehouseName}
+              </div>
             </div>
-
-            <button
-              onClick={handleReserve}
-              disabled={actionLoading === "reserve"}
-              className="w-full bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150"
-            >
-              {actionLoading === "reserve"
-                ? "Reserving..."
-                : `Reserve ${quantity} unit${quantity > 1 ? "s" : ""}`}
-            </button>
+            <div className="bg-background/80 px-4 py-2 rounded-2xl border border-card-border flex flex-col items-end">
+              <span className="text-[10px] font-bold text-muted uppercase tracking-widest">Available</span>
+              <span className="text-lg font-black text-foreground">{available}</span>
+            </div>
           </div>
-        )}
+        </div>
 
-        {/* Reservation Details */}
-        {reservation && (
-          <div className="space-y-6">
-            {/* Status Badge */}
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-muted">Status:</span>
-              <span
-                className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                  reservation.status === "PENDING"
-                    ? "bg-warning/20 text-warning"
-                    : reservation.status === "CONFIRMED"
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
-                }`}
+        <div className="p-8">
+          {!reservation ? (
+            <div className="space-y-8">
+              <div className="space-y-4">
+                <label className="text-xs font-bold text-muted uppercase tracking-widest flex justify-between">
+                  Reservation Quantity
+                  <span className="text-accent">Max Hold: {Math.min(available, 10)}</span>
+                </label>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="1"
+                    max={Math.min(available, 10)}
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value))}
+                    className="flex-1 accent-accent"
+                  />
+                  <div className="w-16 h-12 flex items-center justify-center bg-background border border-card-border rounded-xl text-xl font-black text-foreground">
+                    {quantity}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-accent/5 border border-accent/20 rounded-2xl p-4 flex gap-4">
+                <ShieldCheck className="w-5 h-5 text-accent shrink-0 mt-0.5" />
+                <p className="text-xs text-muted leading-relaxed">
+                  Reservations are immediate and concurrency-safe. This hold prevents other users from purchasing these units while you checkout.
+                </p>
+              </div>
+
+              <button
+                onClick={handleReserve}
+                disabled={loading === "reserve"}
+                className="w-full h-14 bg-accent hover:bg-accent-hover disabled:bg-card-border disabled:cursor-not-allowed text-white font-black text-lg rounded-2xl flex items-center justify-center gap-2"
               >
-                {reservation.status}
-              </span>
+                {loading === "reserve" ? <Loader2 className="w-5 h-5" /> : "Initiate Reservation"}
+              </button>
             </div>
+          ) : (
+            <div className="space-y-8">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-muted uppercase tracking-widest">System Status</span>
+                <div className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+                  reservation.status === "PENDING" ? "bg-warning/10 text-warning border-warning/20" : 
+                  reservation.status === "CONFIRMED" ? "bg-success/10 text-success border-success/20" : 
+                  "bg-danger/10 text-danger border-danger/20"
+                )}>
+                  {reservation.status}
+                </div>
+              </div>
 
-            {/* Details */}
-            <div className="bg-background/50 rounded-lg p-4 space-y-2 font-mono text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted">Reservation ID</span>
-                <span>{reservation.id}</span>
+              {reservation.status === "PENDING" && (
+                <div className={cn(
+                  "flex flex-col items-center justify-center py-10 rounded-3xl border",
+                  timeLeft <= 60 ? "bg-danger/5 border-danger/20" : "bg-accent/5 border-accent/20"
+                )}>
+                  <div className="flex items-center gap-2 text-muted text-xs font-bold uppercase tracking-widest mb-2">
+                    <Clock className={cn("w-4 h-4", timeLeft <= 60 && "text-danger")} />
+                    Time Remaining
+                  </div>
+                  <div className={cn("text-6xl font-black tracking-tighter tabular-nums", timeLeft <= 60 ? "text-danger" : "text-foreground")}>
+                    {formatTime(timeLeft)}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-background/50 rounded-2xl p-6 space-y-3 font-mono text-[10px]">
+                <div className="flex justify-between border-b border-card-border/50 pb-2">
+                  <span className="text-muted">TRACE ID</span>
+                  <span className="text-foreground select-all">{reservation.id}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted">ALLOCATED</span>
+                  <span className="text-foreground">{reservation.quantity} UNITS</span>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Quantity</span>
-                <span>{reservation.quantity} units</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted">Created</span>
-                <span>{new Date(reservation.createdAt).toLocaleTimeString()}</span>
-              </div>
+
+              {reservation.status === "PENDING" ? (
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => handleAction("confirm")}
+                    disabled={loading !== null}
+                    className="flex-1 h-14 bg-success hover:bg-success/80 disabled:opacity-50 text-white font-black rounded-2xl flex items-center justify-center gap-2"
+                  >
+                    {loading === "confirm" ? <Loader2 className="w-5 h-5" /> : <><CheckCircle2 className="w-5 h-5" /> Confirm</>}
+                  </button>
+                  <button
+                    onClick={() => handleAction("release")}
+                    disabled={loading !== null}
+                    className="flex-1 h-14 bg-card-border hover:bg-danger/20 hover:text-danger disabled:opacity-50 text-foreground font-black rounded-2xl flex items-center justify-center gap-2"
+                  >
+                    {loading === "release" ? <Loader2 className="w-5 h-5" /> : <><XCircle className="w-5 h-5" /> Release</>}
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center space-y-6 pt-4">
+                  <div className={cn(
+                    "w-16 h-16 rounded-full mx-auto flex items-center justify-center border-4",
+                    reservation.status === "CONFIRMED" ? "bg-success/10 border-success text-success" : "bg-danger/10 border-danger text-danger"
+                  )}>
+                    {reservation.status === "CONFIRMED" ? <CheckCircle2 className="w-8 h-8" /> : <XCircle className="w-8 h-8" />}
+                  </div>
+                  <h2 className="text-2xl font-black text-foreground">
+                    {reservation.status === "CONFIRMED" ? "Order Finalized" : "Stock Released"}
+                  </h2>
+                  <button
+                    onClick={() => router.push("/")}
+                    className="bg-accent hover:bg-accent-hover text-white px-8 py-3 rounded-2xl font-black shadow-xl shadow-accent/20"
+                  >
+                    Return to Dashboard
+                  </button>
+                </div>
+              )}
             </div>
-
-            {/* Countdown Timer */}
-            {reservation.status === "PENDING" && (
-              <div
-                className={`text-center p-6 rounded-xl border ${
-                  timeLeft <= 60
-                    ? "bg-danger/10 border-danger/30"
-                    : timeLeft <= 180
-                    ? "bg-warning/10 border-warning/30"
-                    : "bg-accent/10 border-accent/30"
-                }`}
-              >
-                <p className="text-sm text-muted mb-1">Expires in</p>
-                <p
-                  className={`text-5xl font-bold font-mono tracking-wider ${
-                    timeLeft <= 60
-                      ? "text-danger animate-pulse"
-                      : timeLeft <= 180
-                      ? "text-warning"
-                      : "text-accent"
-                  }`}
-                >
-                  {formatTime(timeLeft)}
-                </p>
-                <p className="text-xs text-muted mt-2">
-                  Confirm before time runs out or the reservation will be
-                  released
-                </p>
-              </div>
-            )}
-
-            {/* Action Buttons */}
-            {reservation.status === "PENDING" && (
-              <div className="flex gap-3">
-                <button
-                  onClick={handleConfirm}
-                  disabled={actionLoading !== null}
-                  className="flex-1 bg-success hover:bg-success/80 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150"
-                >
-                  {actionLoading === "confirm"
-                    ? "Confirming..."
-                    : "✓ Confirm Order"}
-                </button>
-                <button
-                  onClick={handleRelease}
-                  disabled={actionLoading !== null}
-                  className="flex-1 bg-danger hover:bg-danger/80 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-3 px-6 rounded-lg transition-colors duration-150"
-                >
-                  {actionLoading === "release"
-                    ? "Releasing..."
-                    : "✕ Release"}
-                </button>
-              </div>
-            )}
-
-            {/* Completed State */}
-            {reservation.status !== "PENDING" && (
-              <div className="text-center space-y-4">
-                <p
-                  className={`text-lg font-semibold ${
-                    reservation.status === "CONFIRMED"
-                      ? "text-success"
-                      : "text-danger"
-                  }`}
-                >
-                  {reservation.status === "CONFIRMED"
-                    ? "✅ Order confirmed! Stock has been deducted."
-                    : "❌ Reservation released. Stock has been restored."}
-                </p>
-                <button
-                  onClick={() => router.push("/")}
-                  className="bg-accent hover:bg-accent-hover text-white font-medium py-2 px-6 rounded-lg transition-colors"
-                >
-                  ← Back to Products
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Error Display */}
-        {error && (
-          <div className="mt-6 bg-danger/10 border border-danger/30 rounded-lg p-4">
-            <p className="text-danger text-sm font-medium">{error}</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
@@ -339,13 +244,7 @@ function ReservePageContent() {
 
 export default function ReservePage() {
   return (
-    <Suspense
-      fallback={
-        <div className="max-w-2xl mx-auto px-6 py-16">
-          <div className="animate-pulse h-96 bg-card-bg rounded-xl" />
-        </div>
-      }
-    >
+    <Suspense fallback={<div className="max-w-2xl mx-auto px-6 py-32 flex justify-center"><Loader2 className="w-10 h-10 text-accent" /></div>}>
       <ReservePageContent />
     </Suspense>
   );

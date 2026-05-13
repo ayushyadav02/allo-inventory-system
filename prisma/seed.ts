@@ -8,44 +8,62 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter })
 
 async function main() {
-  // Clean up existing data (order matters due to foreign keys)
   await prisma.reservation.deleteMany()
   await prisma.stock.deleteMany()
   await prisma.product.deleteMany()
   await prisma.warehouse.deleteMany()
 
   const w1 = await prisma.warehouse.create({
-    data: { name: "Delhi Warehouse" },
+    data: { name: "Delhi Main Fulfillment" },
   })
 
   const w2 = await prisma.warehouse.create({
-    data: { name: "Mumbai Warehouse" },
+    data: { name: "Mumbai Express Hub" },
   })
 
-  const p1 = await prisma.product.create({
-    data: { name: "iPhone 15" },
+  await prisma.product.create({
+    data: {
+      name: "iPhone 15 Pro",
+      description: "Titanium design, A17 Pro chip, and a versatile Pro camera system. The ultimate iPhone experience.",
+      imageUrl: "/products/iphone.png",
+      stocks: {
+        create: [
+          { warehouseId: w1.id, totalUnits: 15 },
+          { warehouseId: w2.id, totalUnits: 10 },
+        ]
+      }
+    },
   })
 
-  const p2 = await prisma.product.create({
-    data: { name: "MacBook Air M3" },
+  await prisma.product.create({
+    data: {
+      name: "MacBook Air M3",
+      description: "Supercharged by M3 chip. Strikingly thin and fast, so you can work, play, or create anywhere.",
+      imageUrl: "/products/macbook.png",
+      stocks: {
+        create: [
+          { warehouseId: w1.id, totalUnits: 5 },
+          { warehouseId: w2.id, totalUnits: 8 },
+        ]
+      }
+    },
   })
 
-  const p3 = await prisma.product.create({
-    data: { name: "AirPods Pro" },
+  await prisma.product.create({
+    data: {
+      name: "AirPods Pro (2nd Gen)",
+      description: "Up to 2x more Active Noise Cancellation. Transparency mode and Personalized Spatial Audio.",
+      imageUrl: "/products/airpods.png",
+      stocks: {
+        create: [
+          { warehouseId: w1.id, totalUnits: 30 },
+          { warehouseId: w2.id, totalUnits: 25 },
+        ]
+      }
+    },
   })
 
-  await prisma.stock.createMany({
-    data: [
-      { productId: p1.id, warehouseId: w1.id, totalUnits: 10 },
-      { productId: p1.id, warehouseId: w2.id, totalUnits: 5 },
-      { productId: p2.id, warehouseId: w1.id, totalUnits: 3 },
-      { productId: p2.id, warehouseId: w2.id, totalUnits: 7 },
-      { productId: p3.id, warehouseId: w1.id, totalUnits: 20 },
-      { productId: p3.id, warehouseId: w2.id, totalUnits: 15 },
-    ],
-  })
-
-  console.log("✅ Seed complete!")
+  console.log("✅ Realistic seed complete!")
 }
 
 main()
